@@ -49,5 +49,12 @@ export function createDb(path: string): Database.Database {
     ).run()
   }
 
+  // Safe migration — adds reminded_at column if it doesn't exist
+  try {
+    db.exec(`ALTER TABLE conversation_state ADD COLUMN reminded_at DATETIME DEFAULT NULL`)
+  } catch {
+    // Column already exists — ignore
+  }
+
   return db
 }

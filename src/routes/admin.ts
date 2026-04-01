@@ -4,7 +4,7 @@ import { requireAdminSession, setSessionCookie } from '../admin/auth.js'
 import { loginPage, ideasPage, reviewsPage } from '../admin/views.js'
 import { createIdeasService } from '../services/ideasService.js'
 import { createReviewsService } from '../services/reviewsService.js'
-import { sendWeekly, sendReviewPrompt } from '../services/schedulerService.js'
+import { sendWeekly, sendReviewPrompt, sendReminder } from '../services/schedulerService.js'
 import { sendMessage as telegramSendMessage } from '../telegram.js'
 import type { SendMessage } from '../types.js'
 
@@ -90,6 +90,13 @@ export function createAdminRouter(
     const chatId = process.env.TELEGRAM_CHAT_ID ?? ''
     const result = await sendReviewPrompt(db, sendMessage, chatId)
     const flash = result.skipped ? 'No active topic to review.' : 'Review prompt sent to Telegram!'
+    res.redirect(`/admin?flash=${encodeURIComponent(flash)}`)
+  })
+
+  router.post('/send-reminder', async (_req, res) => {
+    const chatId = process.env.TELEGRAM_CHAT_ID ?? ''
+    const result = await sendReminder(db, sendMessage, chatId)
+    const flash = result.skipped ? 'No reminder needed (not in review window or already sent).' : 'Reminder sent!'
     res.redirect(`/admin?flash=${encodeURIComponent(flash)}`)
   })
 

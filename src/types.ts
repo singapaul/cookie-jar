@@ -30,4 +30,9 @@ export interface ConversationState {
   updated_at: string | null
 }
 
-export type SendMessage = (chatId: string, text: string) => Promise<unknown>
+export interface InlineKeyboardButton { text: string; callback_data: string }
+export interface MessageOptions {
+  parse_mode?: 'HTML'
+  reply_markup?: { inline_keyboard: InlineKeyboardButton[][] }
+}
+export type SendMessage = (chatId: string, text: string, options?: MessageOptions) => Promise<unknown>

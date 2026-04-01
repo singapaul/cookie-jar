@@ -188,6 +188,9 @@ export function ideasPage(
       <form method="POST" action="/admin/send-review-prompt">
         <button type="submit" class="outline">Send review prompt</button>
       </form>
+      <form method="POST" action="/admin/send-reminder">
+        <button type="submit" class="outline">Send reminder</button>
+      </form>
     </div>
     <h2>Ideas</h2>
     <form method="GET" action="/admin" style="display:flex;gap:0.5rem;margin-bottom:1rem">

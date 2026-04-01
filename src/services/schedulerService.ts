@@ -32,14 +32,19 @@ export async function sendWeekly(
   const sent = db.prepare('SELECT * FROM topics WHERE id = ?').get(topic.id) as Topic
 
   const lines = [
-    `Topic this week: ${sent.title}`,
-    sent.category ? `Category: ${sent.category}` : null,
-    sent.url ?? null,
+    `📚 <b>This week's topic:</b> ${sent.title}`,
+    sent.category ? `🏷 Category: ${sent.category}` : null,
+    sent.url ? `🔗 ${sent.url}` : null,
     '',
-    "Good luck — I'll check in Sunday!",
+    "Good luck — I'll check in on Sunday! 🍪",
   ].filter((l): l is string => l !== null)
 
-  await sendMessage(chatId, lines.join('\n'))
+  await sendMessage(chatId, lines.join('\n'), {
+    parse_mode: 'HTML',
+    reply_markup: {
+      inline_keyboard: [[{ text: '⏭ Skip this topic', callback_data: 'skip_topic' }]],
+    },
+  })
 
   return { aborted: false, topic: sent }
 }
@@ -53,10 +58,32 @@ export async function sendReviewPrompt(
   if (!state.topic_id) return { skipped: true }
 
   const topic = db.prepare('SELECT * FROM topics WHERE id = ?').get(state.topic_id) as Topic
-  await sendMessage(chatId, `Time to review this week's topic: ${topic.title}. What were the pros?`)
+  await sendMessage(chatId, `⭐ Time to review <b>${topic.title}</b>! Let's go 👇\n\n<b>Step 1 of 4 — Pros</b>\nWhat did you like about it?`, { parse_mode: 'HTML' })
 
   db.prepare("UPDATE conversation_state SET step = 'awaiting_pros', updated_at = ? WHERE id = 1")
     .run(new Date().toISOString())
 
+  return { skipped: false }
+}
+
+export async function sendReminder(
+  db: Database.Database,
+  sendMessage: SendMessage,
+  chatId: string
+): Promise<{ skipped: boolean }> {
+  const state = db.prepare('SELECT * FROM conversation_state WHERE id = 1').get() as ConversationState & { reminded_at: string | null }
+
+  if (state.step !== 'awaiting_pros') return { skipped: true }
+  if (state.reminded_at !== null) return { skipped: true }
+
+  if (!state.updated_at) return { skipped: true }
+  const updatedAt = new Date(state.updated_at).getTime()
+  const fourHoursMs = 4 * 60 * 60 * 1000
+  if (Date.now() - updatedAt < fourHoursMs) return { skipped: true }
+
+  const topic = db.prepare('SELECT * FROM topics WHERE id = ?').get(state.topic_id) as Topic
+  await sendMessage(chatId, `⏰ Hey! Don't forget to review this week's topic: <b>${topic.title}</b>. Tap /review to start! 🍪`, { parse_mode: 'HTML' })
+
+  db.prepare('UPDATE conversation_state SET reminded_at = ? WHERE id = 1').run(new Date().toISOString())
   return { skipped: false }
 }

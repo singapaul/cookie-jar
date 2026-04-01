@@ -14,7 +14,7 @@ export function createApp(db: Database.Database | null, apiKey: string, sendMess
   app.use(cookieParser(apiKey))
 
   if (db) {
-    app.use('/telegram/webhook', createWebhookRouter(db))
+    app.use('/telegram/webhook', createWebhookRouter(db, sendMessage))
     app.use('/admin', createAdminRouter(db, apiKey, sendMessage))
   }
 

@@ -515,3 +515,12 @@ describe('GET /admin/reviews/export.json', () => {
     expect(Array.isArray(res.body)).toBe(true)
   })
 })
+
+describe('POST /admin/send-reminder', () => {
+  it('redirects with skipped flash when no review in progress', async () => {
+    const cookie = await getSessionCookie()
+    const res = await request(app).post('/admin/send-reminder').set('Cookie', cookie)
+    expect(res.status).toBe(302)
+    expect(decodeURIComponent(res.headers.location)).toMatch(/no reminder needed/i)
+  })
+})

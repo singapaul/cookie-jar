@@ -25,7 +25,12 @@ export function getBot(): TelegramBot | null {
   return bot
 }
 
-export function sendMessage(chatId: string, text: string): Promise<TelegramBot.Message> {
+export function sendMessage(chatId: string, text: string, options?: import('./types.js').MessageOptions): Promise<TelegramBot.Message> {
   if (!bot) throw new Error('Bot not initialised')
-  return bot.sendMessage(chatId, text)
+  return bot.sendMessage(chatId, text, options as never)
+}
+
+export function answerCallbackQuery(queryId: string): Promise<unknown> {
+  if (!bot) return Promise.resolve()
+  return bot.answerCallbackQuery(queryId)
 }
