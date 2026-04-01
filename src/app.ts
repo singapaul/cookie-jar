@@ -8,6 +8,10 @@ export function createApp(db: Database.Database | null, apiKey: string): Express
   const app = express()
   app.use(express.json())
 
+  if (db) {
+    app.use('/telegram/webhook', createWebhookRouter(db))
+  }
+
   app.use((req, res, next) => {
     const auth = req.headers['authorization']
     if (!auth || auth !== `Bearer ${apiKey}`) {
@@ -21,7 +25,6 @@ export function createApp(db: Database.Database | null, apiKey: string): Express
   if (db) {
     app.use('/ideas', createIdeasRouter(db))
     app.use('/reviews', createReviewsRouter(db))
-    app.use('/telegram/webhook', createWebhookRouter(db))
   }
 
   return app
