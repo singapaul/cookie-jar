@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3'
-import { mkdirSync, dirname } from 'node:fs'
+import { mkdirSync } from 'node:fs'
+import { dirname } from 'node:path'
 
 export function createDb(path: string): Database.Database {
   if (path !== ':memory:') {
