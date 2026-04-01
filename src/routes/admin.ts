@@ -8,6 +8,8 @@ import { sendWeekly, sendReviewPrompt } from '../services/schedulerService.js'
 import { sendMessage as telegramSendMessage } from '../telegram.js'
 import type { SendMessage } from '../types.js'
 
+const PAGE_SIZE = 20
+
 export function createAdminRouter(
   db: Database.Database,
   apiKey: string,
@@ -33,13 +35,25 @@ export function createAdminRouter(
 
   router.get('/', (req, res) => {
     const svc = createIdeasService(db)
+    const search = req.query.search as string | undefined
+    const category = req.query.category as string | undefined
+    const page = Number(req.query.page ?? 1)
+
+    const totalActive =
+      svc.count({ status: 'pending', search, category }) +
+      svc.count({ status: 'skipped', search, category })
+
+    const offset = (page - 1) * PAGE_SIZE
+
     const topics = [
-      ...svc.list({ status: 'pending' }),
-      ...svc.list({ status: 'skipped' }),
-      ...svc.list({ status: 'archived' }),
+      ...svc.list({ status: 'pending', search, category, limit: PAGE_SIZE, offset }),
+      ...svc.list({ status: 'skipped', search, category, limit: PAGE_SIZE, offset }),
+      ...svc.list({ status: 'archived', search, category }),
     ]
+
     const flash = req.query.flash as string | undefined
-    res.send(ideasPage(topics, flash))
+    const stats = svc.getStats()
+    res.send(ideasPage(topics, flash, stats, search, category, page, totalActive, PAGE_SIZE))
   })
 
   router.post('/ideas', (req, res) => {
@@ -79,9 +93,37 @@ export function createAdminRouter(
     res.redirect(`/admin?flash=${encodeURIComponent(flash)}`)
   })
 
-  router.get('/reviews', (_req, res) => {
+  router.get('/reviews/export.csv', (_req, res) => {
+    const reviews = createReviewsService(db).list({}) as Record<string, unknown>[]
+    const headers = ['id', 'topic_id', 'title', 'category', 'rating', 'pros', 'cons', 'verdict', 'reviewed_at']
+    const rows = reviews.map(r => headers.map(h => JSON.stringify(r[h] ?? '')).join(','))
+    const csv = [headers.join(','), ...rows].join('\n')
+    res.setHeader('Content-Type', 'text/csv')
+    res.setHeader('Content-Disposition', 'attachment; filename="reviews.csv"')
+    res.send(csv)
+  })
+
+  router.get('/reviews/export.json', (_req, res) => {
     const reviews = createReviewsService(db).list({})
-    res.send(reviewsPage(reviews as Parameters<typeof reviewsPage>[0]))
+    res.setHeader('Content-Disposition', 'attachment; filename="reviews.json"')
+    res.json(reviews)
+  })
+
+  router.post('/reviews/:id/edit', (req, res) => {
+    const { pros, cons, rating, verdict } = req.body as Record<string, string>
+    createReviewsService(db).update(Number(req.params.id), {
+      pros, cons, verdict, rating: rating ? Number(rating) : undefined,
+    })
+    res.redirect('/admin/reviews')
+  })
+
+  router.get('/reviews', (req, res) => {
+    const svc = createReviewsService(db)
+    const page = Number(req.query.page ?? 1)
+    const total = svc.count({})
+    const offset = (page - 1) * PAGE_SIZE
+    const reviews = svc.list({ limit: PAGE_SIZE, offset })
+    res.send(reviewsPage(reviews as Parameters<typeof reviewsPage>[0], page, total, PAGE_SIZE))
   })
 
   return router

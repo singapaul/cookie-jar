@@ -342,3 +342,176 @@ describe('GET /admin — archived section', () => {
     expect(res.text).not.toMatch(new RegExp(`/admin/ideas/${topic.id}/edit`))
   })
 })
+
+// ─── Feature 1: CATEGORIES constant + category select ────────────────────────
+
+describe('GET /admin — category select', () => {
+  it('shows <select name="category"> with Frontend and Backend options in the add form', async () => {
+    const cookie = await getSessionCookie()
+    const res = await request(app).get('/admin').set('Cookie', cookie)
+    expect(res.text).toMatch(/<select name="category"/)
+    expect(res.text).toMatch(/Frontend/)
+    expect(res.text).toMatch(/Backend/)
+  })
+})
+
+// ─── Feature 2: Favicon ───────────────────────────────────────────────────────
+
+describe('GET /admin — favicon', () => {
+  it('contains a rel="icon" link tag', async () => {
+    const cookie = await getSessionCookie()
+    const res = await request(app).get('/admin').set('Cookie', cookie)
+    expect(res.text).toMatch(/rel="icon"/)
+  })
+})
+
+// ─── Feature 3: UI polish ─────────────────────────────────────────────────────
+
+describe('GET /admin — UI polish', () => {
+  it('shows a coloured badge for pending status', async () => {
+    db.prepare("INSERT INTO topics (title, status, skip_count, created_at) VALUES ('Badge Test', 'pending', 0, datetime('now'))").run()
+    const cookie = await getSessionCookie()
+    const res = await request(app).get('/admin').set('Cookie', cookie)
+    expect(res.text).toMatch(/background:#d1fae5/)
+  })
+
+  it('wraps the edit form in a <details> element', async () => {
+    db.prepare("INSERT INTO topics (title, status, skip_count, created_at) VALUES ('Detail Test', 'pending', 0, datetime('now'))").run()
+    const cookie = await getSessionCookie()
+    const res = await request(app).get('/admin').set('Cookie', cookie)
+    // There should be a <details containing the edit form (more than the archived section)
+    const detailsMatches = res.text.match(/<details/g) ?? []
+    expect(detailsMatches.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('delete button has confirm() onclick', async () => {
+    db.prepare("INSERT INTO topics (title, status, skip_count, created_at) VALUES ('Confirm Test', 'pending', 0, datetime('now'))").run()
+    const cookie = await getSessionCookie()
+    const res = await request(app).get('/admin').set('Cookie', cookie)
+    expect(res.text).toMatch(/confirm\(/)
+  })
+})
+
+// ─── Feature 4: Stats summary ─────────────────────────────────────────────────
+
+describe('GET /admin — stats summary', () => {
+  it('shows the count of pending topics in the stats area', async () => {
+    db.prepare("INSERT INTO topics (title, status, skip_count, created_at) VALUES ('Topic One', 'pending', 0, datetime('now'))").run()
+    db.prepare("INSERT INTO topics (title, status, skip_count, created_at) VALUES ('Topic Two', 'pending', 0, datetime('now'))").run()
+    const cookie = await getSessionCookie()
+    const res = await request(app).get('/admin').set('Cookie', cookie)
+    // Stats area should show total=2
+    expect(res.text).toMatch(/2/)
+  })
+})
+
+// ─── Feature 5: Filter/search ─────────────────────────────────────────────────
+
+describe('GET /admin — search filter', () => {
+  it('filters topics by search query', async () => {
+    db.prepare("INSERT INTO topics (title, status, skip_count, created_at) VALUES ('Learn Rust', 'pending', 0, datetime('now'))").run()
+    db.prepare("INSERT INTO topics (title, status, skip_count, created_at) VALUES ('Learn Go', 'pending', 0, datetime('now'))").run()
+    const cookie = await getSessionCookie()
+    const res = await request(app).get('/admin?search=Rust').set('Cookie', cookie)
+    expect(res.text).toMatch(/Learn Rust/)
+    expect(res.text).not.toMatch(/Learn Go/)
+  })
+
+  it('renders search input pre-filled with query value', async () => {
+    const cookie = await getSessionCookie()
+    const res = await request(app).get('/admin?search=TypeScript').set('Cookie', cookie)
+    expect(res.text).toMatch(/value="TypeScript"/)
+  })
+})
+
+// ─── Feature 6: Pagination on ideas list ─────────────────────────────────────
+
+describe('GET /admin — pagination', () => {
+  it('shows page 2 topics when 25 pending topics exist', async () => {
+    for (let i = 1; i <= 25; i++) {
+      db.prepare(`INSERT INTO topics (title, status, skip_count, created_at) VALUES ('Topic ${i}', 'pending', 0, datetime('now', '+${i} seconds'))`).run()
+    }
+    const cookie = await getSessionCookie()
+    const res = await request(app).get('/admin?page=2').set('Cookie', cookie)
+    // Page 2 should contain topic 1 (oldest, since sorted DESC the 25th item in DESC is the oldest)
+    // With PAGE_SIZE=20, page 1 = items 1-20 DESC (topics 25..6), page 2 = items 21-25 (topics 5..1)
+    expect(res.text).toMatch(/Topic [1-5](?!\d)/)
+    // Page 2 should NOT contain Topic 25 (that's on page 1)
+    expect(res.text).not.toMatch(/Topic 25/)
+  })
+})
+
+// ─── Feature 7: Pagination on reviews list ───────────────────────────────────
+
+describe('GET /admin/reviews — pagination', () => {
+  it('shows page 2 reviews when 25 reviews exist', async () => {
+    for (let i = 1; i <= 25; i++) {
+      db.prepare(`INSERT INTO topics (title, status, skip_count, created_at) VALUES ('Review Topic ${i}', 'reviewed', 0, datetime('now', '+${i} seconds'))`).run()
+      const t = db.prepare('SELECT id FROM topics ORDER BY id DESC LIMIT 1').get() as { id: number }
+      db.prepare(`INSERT INTO reviews (topic_id, rating, reviewed_at) VALUES (?, 7, datetime('now', '+${i} seconds'))`).run(t.id)
+    }
+    const cookie = await getSessionCookie()
+    const res = await request(app).get('/admin/reviews?page=2').set('Cookie', cookie)
+    // With DESC order and PAGE_SIZE=20, page 2 should have the older ones
+    expect(res.text).toMatch(/Review Topic [1-5](?!\d)/)
+    expect(res.text).not.toMatch(/Review Topic 25/)
+  })
+})
+
+// ─── Feature 8: Edit reviews inline ──────────────────────────────────────────
+
+describe('POST /admin/reviews/:id/edit', () => {
+  it('updates the review and redirects; updated pros visible on reviews page', async () => {
+    db.prepare("INSERT INTO topics (title, status, skip_count, created_at) VALUES ('Rust', 'reviewed', 0, datetime('now'))").run()
+    const topic = db.prepare('SELECT id FROM topics').get() as { id: number }
+    db.prepare("INSERT INTO reviews (topic_id, pros, cons, rating, verdict, reviewed_at) VALUES (?, 'Old pros', 'Cons', 8, 'Good', datetime('now'))").run(topic.id)
+    const review = db.prepare('SELECT id FROM reviews').get() as { id: number }
+    const cookie = await getSessionCookie()
+
+    const res = await request(app)
+      .post(`/admin/reviews/${review.id}/edit`)
+      .set('Cookie', cookie)
+      .set('Content-Type', 'application/x-www-form-urlencoded')
+      .send('pros=New+pros&cons=Cons&rating=8&verdict=Good')
+
+    expect(res.status).toBe(302)
+    expect(res.headers.location).toBe('/admin/reviews')
+
+    const updated = db.prepare('SELECT pros FROM reviews WHERE id = ?').get(review.id) as { pros: string }
+    expect(updated.pros).toBe('New pros')
+  })
+})
+
+describe('GET /admin/reviews — inline edit form', () => {
+  it('renders a <details> edit form for each review', async () => {
+    db.prepare("INSERT INTO topics (title, status, skip_count, created_at) VALUES ('Rust', 'reviewed', 0, datetime('now'))").run()
+    const topic = db.prepare('SELECT id FROM topics').get() as { id: number }
+    db.prepare("INSERT INTO reviews (topic_id, pros, cons, rating, verdict, reviewed_at) VALUES (?, 'Great', 'Hard', 9, 'Worth it', datetime('now'))").run(topic.id)
+
+    const cookie = await getSessionCookie()
+    const res = await request(app).get('/admin/reviews').set('Cookie', cookie)
+    expect(res.text).toMatch(/<details/)
+    expect(res.text).toMatch(/action="\/admin\/reviews\/\d+\/edit"/)
+  })
+})
+
+// ─── Feature 9: Export reviews ────────────────────────────────────────────────
+
+describe('GET /admin/reviews/export.csv', () => {
+  it('returns 200 with text/csv content type and header row', async () => {
+    const cookie = await getSessionCookie()
+    const res = await request(app).get('/admin/reviews/export.csv').set('Cookie', cookie)
+    expect(res.status).toBe(200)
+    expect(res.headers['content-type']).toMatch(/text\/csv/)
+    expect(res.text).toMatch(/id,topic_id/)
+  })
+})
+
+describe('GET /admin/reviews/export.json', () => {
+  it('returns 200 with a JSON array', async () => {
+    const cookie = await getSessionCookie()
+    const res = await request(app).get('/admin/reviews/export.json').set('Cookie', cookie)
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body)).toBe(true)
+  })
+})

@@ -15,12 +15,51 @@ export function createIdeasService(db: Database.Database) {
     return db.prepare('SELECT * FROM topics WHERE id = ?').get(result.lastInsertRowid) as Topic
   }
 
-  function list({ category, status }: { category?: string; status?: string } = {}): Topic[] {
+  function list({ category, status, search, limit, offset }: { category?: string; status?: string; search?: string; limit?: number; offset?: number } = {}): Topic[] {
     let query = 'SELECT * FROM topics WHERE 1=1'
-    const params: string[] = []
+    const params: (string | number)[] = []
     if (category) { query += ' AND category = ?'; params.push(category) }
     if (status)   { query += ' AND status = ?';   params.push(status) }
+    if (search)   { query += ' AND title LIKE ?';  params.push(`%${search}%`) }
+    query += ' ORDER BY created_at DESC'
+    if (limit !== undefined) { query += ' LIMIT ?'; params.push(limit) }
+    if (offset !== undefined) { query += ' OFFSET ?'; params.push(offset) }
     return db.prepare(query).all(...params) as Topic[]
+  }
+
+  function count({ category, status, search }: { category?: string; status?: string; search?: string } = {}): number {
+    let query = 'SELECT COUNT(*) as n FROM topics WHERE 1=1'
+    const params: (string | number)[] = []
+    if (category) { query += ' AND category = ?'; params.push(category) }
+    if (status)   { query += ' AND status = ?';   params.push(status) }
+    if (search)   { query += ' AND title LIKE ?';  params.push(`%${search}%`) }
+    return (db.prepare(query).get(...params) as { n: number }).n
+  }
+
+  function getStats(): {
+    total: number
+    pending: number
+    skipped: number
+    archived: number
+    sent: number
+    reviewed: number
+    avgRating: number | null
+  } {
+    const counts = db.prepare(`
+      SELECT status, COUNT(*) as n FROM topics GROUP BY status
+    `).all() as { status: string; n: number }[]
+    const byStatus = Object.fromEntries(counts.map(r => [r.status, r.n]))
+    const avg = (db.prepare('SELECT AVG(rating) as avg FROM reviews').get() as { avg: number | null }).avg
+    const total = counts.reduce((s, r) => s + r.n, 0)
+    return {
+      total,
+      pending:  byStatus['pending']  ?? 0,
+      skipped:  byStatus['skipped']  ?? 0,
+      archived: byStatus['archived'] ?? 0,
+      sent:     byStatus['sent']     ?? 0,
+      reviewed: byStatus['reviewed'] ?? 0,
+      avgRating: avg !== null ? Math.round(avg * 10) / 10 : null,
+    }
   }
 
   function update(id: number, fields: Partial<Topic>): Topic | ServiceError {
@@ -56,5 +95,5 @@ export function createIdeasService(db: Database.Database) {
     return db.prepare('SELECT * FROM topics WHERE id = ?').get(id) as Topic
   }
 
-  return { create, list, update, remove, skip }
+  return { create, list, count, getStats, update, remove, skip }
 }
