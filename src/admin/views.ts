@@ -211,7 +211,7 @@ export function loginPage(error?: string): string {
         ${error ? `<p style="color:red;margin-bottom:0.75rem">${error}</p>` : ''}
         <form method="POST" action="/admin/login">
           <label style="display:block;margin-bottom:0.5rem;font-size:0.875rem;font-weight:500">Password</label>
-          <input type="password" name="password" autofocus required style="margin-bottom:0.75rem">
+          <input type="password" name="password" placeholder="Enter password" autofocus required style="margin-bottom:0.75rem">
           <button type="submit" class="btn btn-primary" style="width:100%">Log in</button>
         </form>
       </div>
@@ -242,10 +242,10 @@ function topicRow(t: Topic): string {
     <details style="margin-top:0.25rem">
       <summary class="btn btn-outline btn-sm" style="cursor:pointer;list-style:none;display:inline-flex">Edit</summary>
       <form method="POST" action="/admin/ideas/${t.id}/edit" style="margin-top:0.5rem;display:grid;gap:0.4rem">
-        <input name="title" value="${t.title}" required>
+        <input name="title" value="${t.title}" placeholder="Title" required>
         ${categorySelect('category', t.category)}
-        <input name="description" value="${t.description ?? ''}">
-        <input name="url" value="${t.url ?? ''}">
+        <input name="description" value="${t.description ?? ''}" placeholder="Description (optional)">
+        <input name="url" value="${t.url ?? ''}" placeholder="URL (optional)">
         <button type="submit" class="btn btn-primary btn-sm">Save</button>
       </form>
     </details>` : ''
@@ -433,7 +433,7 @@ export function reviewsPage(
             <form method="POST" action="/admin/reviews/${r.id}/edit" style="margin-top:0.5rem;display:grid;gap:0.4rem">
               <textarea name="pros" placeholder="Pros">${r.pros ?? ''}</textarea>
               <textarea name="cons" placeholder="Cons">${r.cons ?? ''}</textarea>
-              <input name="rating" type="number" min="1" max="10" value="${r.rating ?? ''}">
+              <input name="rating" type="number" min="1" max="10" value="${r.rating ?? ''}" placeholder="Rating (1–10)">
               <textarea name="verdict" placeholder="Verdict">${r.verdict ?? ''}</textarea>
               <button type="submit" class="btn btn-outline btn-sm">Save</button>
             </form>
