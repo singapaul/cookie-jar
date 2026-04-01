@@ -1,7 +1,8 @@
 import { Router } from 'express'
 import type Database from 'better-sqlite3'
 import { requireAdminSession, setSessionCookie } from '../admin/auth.js'
-import { loginPage, adminLayout } from '../admin/views.js'
+import { loginPage, ideasPage, adminLayout } from '../admin/views.js'
+import { createIdeasService } from '../services/ideasService.js'
 
 export function createAdminRouter(db: Database.Database, apiKey: string): Router {
   const router = Router()
@@ -22,8 +23,22 @@ export function createAdminRouter(db: Database.Database, apiKey: string): Router
 
   router.use(requireAdminSession)
 
-  router.get('/', (_req, res) => {
-    res.send(adminLayout('Ideas', 'ideas', '<h2>Ideas</h2>'))
+  router.get('/', (req, res) => {
+    const svc = createIdeasService(db)
+    const topics = svc.list({ status: 'pending' }).concat(svc.list({ status: 'skipped' }))
+    const flash = req.query.flash as string | undefined
+    res.send(ideasPage(topics, flash))
+  })
+
+  router.post('/ideas', (req, res) => {
+    const { title, category, description, url } = req.body as Record<string, string>
+    if (!title) {
+      res.redirect('/admin')
+      return
+    }
+    const svc = createIdeasService(db)
+    svc.create({ title, category, description, url })
+    res.redirect('/admin')
   })
 
   router.get('/reviews', (_req, res) => {

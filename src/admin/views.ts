@@ -32,6 +32,36 @@ export function loginPage(error?: string): string {
   `)
 }
 
+import type { Topic } from '../types.js'
+
+export function ideasPage(topics: Topic[], flash?: string): string {
+  const active = topics.filter(t => t.status === 'pending' || t.status === 'skipped')
+
+  const topicRows = active.length === 0
+    ? '<p>No ideas yet — add one below!</p>'
+    : active.map(t => `
+      <article>
+        <header><strong>${t.title}</strong> <small>${t.status}${t.skip_count > 0 ? ` (skipped ${t.skip_count}x)` : ''}</small></header>
+        ${t.category ? `<p>Category: ${t.category}</p>` : ''}
+        ${t.url ? `<p><a href="${t.url}" target="_blank">${t.url}</a></p>` : ''}
+      </article>
+    `).join('')
+
+  return adminLayout('Ideas', 'ideas', `
+    ${flash ? `<div role="alert">${flash}</div>` : ''}
+    <h2>Add Idea</h2>
+    <form method="POST" action="/admin/ideas">
+      <input name="title" placeholder="Title" required>
+      <input name="category" placeholder="Category">
+      <input name="description" placeholder="Description">
+      <input name="url" placeholder="URL">
+      <button type="submit">Add</button>
+    </form>
+    <h2>Ideas</h2>
+    ${topicRows}
+  `)
+}
+
 export function adminLayout(title: string, activePage: 'ideas' | 'reviews', body: string): string {
   return layout(title, `
     <nav>
