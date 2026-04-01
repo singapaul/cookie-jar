@@ -14,7 +14,14 @@ if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_BOT_TOKEN !== 'placeh
   logger.info('Telegram bot initialised')
 }
 
-const port = process.env.PORT ?? 3000
-app.listen(port, () => {
+const port = Number(process.env.PORT ?? 3000)
+logger.info({ port }, 'Binding to port')
+
+const server = app.listen(port, '0.0.0.0', () => {
   logger.info({ port }, 'Server started')
+})
+
+server.on('error', (err) => {
+  logger.error({ err }, 'Failed to start server')
+  process.exit(1)
 })
