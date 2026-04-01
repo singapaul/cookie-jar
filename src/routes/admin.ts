@@ -1,8 +1,11 @@
 import { Router } from 'express'
 import type Database from 'better-sqlite3'
 import { requireAdminSession, setSessionCookie } from '../admin/auth.js'
-import { loginPage, ideasPage, adminLayout } from '../admin/views.js'
+import { loginPage, ideasPage, reviewsPage } from '../admin/views.js'
 import { createIdeasService } from '../services/ideasService.js'
+import { createReviewsService } from '../services/reviewsService.js'
+import { sendWeekly, sendReviewPrompt } from '../services/schedulerService.js'
+import { sendMessage } from '../telegram.js'
 
 export function createAdminRouter(db: Database.Database, apiKey: string): Router {
   const router = Router()
@@ -25,24 +28,55 @@ export function createAdminRouter(db: Database.Database, apiKey: string): Router
 
   router.get('/', (req, res) => {
     const svc = createIdeasService(db)
-    const topics = svc.list({ status: 'pending' }).concat(svc.list({ status: 'skipped' }))
+    const topics = [
+      ...svc.list({ status: 'pending' }),
+      ...svc.list({ status: 'skipped' }),
+      ...svc.list({ status: 'archived' }),
+    ]
     const flash = req.query.flash as string | undefined
     res.send(ideasPage(topics, flash))
   })
 
   router.post('/ideas', (req, res) => {
     const { title, category, description, url } = req.body as Record<string, string>
-    if (!title) {
-      res.redirect('/admin')
-      return
-    }
-    const svc = createIdeasService(db)
-    svc.create({ title, category, description, url })
+    if (!title) { res.redirect('/admin'); return }
+    createIdeasService(db).create({ title, category, description, url })
     res.redirect('/admin')
   })
 
+  router.post('/ideas/:id/edit', (req, res) => {
+    const { title, category, description, url } = req.body as Record<string, string>
+    createIdeasService(db).update(Number(req.params.id), { title, category, description, url })
+    res.redirect('/admin')
+  })
+
+  router.post('/ideas/:id/delete', (req, res) => {
+    createIdeasService(db).remove(Number(req.params.id))
+    res.redirect('/admin')
+  })
+
+  router.post('/ideas/:id/skip', (req, res) => {
+    createIdeasService(db).skip(Number(req.params.id))
+    res.redirect('/admin')
+  })
+
+  router.post('/send-weekly', async (_req, res) => {
+    const chatId = process.env.TELEGRAM_CHAT_ID ?? ''
+    const result = await sendWeekly(db, sendMessage, chatId)
+    const flash = result.aborted ? 'Could not send — check bot state or topic pool.' : 'Topic sent to Telegram!'
+    res.redirect(`/admin?flash=${encodeURIComponent(flash)}`)
+  })
+
+  router.post('/send-review-prompt', async (_req, res) => {
+    const chatId = process.env.TELEGRAM_CHAT_ID ?? ''
+    const result = await sendReviewPrompt(db, sendMessage, chatId)
+    const flash = result.skipped ? 'No active topic to review.' : 'Review prompt sent to Telegram!'
+    res.redirect(`/admin?flash=${encodeURIComponent(flash)}`)
+  })
+
   router.get('/reviews', (_req, res) => {
-    res.send(adminLayout('Reviews', 'reviews', '<h2>Reviews</h2>'))
+    const reviews = createReviewsService(db).list({})
+    res.send(reviewsPage(reviews as Parameters<typeof reviewsPage>[0]))
   })
 
   return router

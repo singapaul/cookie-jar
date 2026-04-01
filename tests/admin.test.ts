@@ -152,3 +152,84 @@ describe('POST /admin/ideas', () => {
     expect(count).toBe(0)
   })
 })
+
+describe('POST /admin/ideas/:id/edit', () => {
+  it('updates topic fields and redirects to /admin', async () => {
+    db.prepare("INSERT INTO topics (title, category, status, skip_count, created_at) VALUES ('Old Title', 'Systems', 'pending', 0, datetime('now'))").run()
+    const topic = db.prepare('SELECT id FROM topics').get() as { id: number }
+    const cookie = await getSessionCookie()
+
+    const res = await request(app)
+      .post(`/admin/ideas/${topic.id}/edit`)
+      .set('Cookie', cookie)
+      .set('Content-Type', 'application/x-www-form-urlencoded')
+      .send('title=New+Title&category=AI&description=desc&url=https://example.com')
+
+    expect(res.status).toBe(302)
+    expect(res.headers.location).toBe('/admin')
+    const updated = db.prepare('SELECT * FROM topics WHERE id = ?').get(topic.id) as { title: string; category: string }
+    expect(updated.title).toBe('New Title')
+    expect(updated.category).toBe('AI')
+  })
+})
+
+describe('POST /admin/ideas/:id/delete', () => {
+  it('deletes the topic and redirects to /admin', async () => {
+    db.prepare("INSERT INTO topics (title, status, skip_count, created_at) VALUES ('To Delete', 'pending', 0, datetime('now'))").run()
+    const topic = db.prepare('SELECT id FROM topics').get() as { id: number }
+    const cookie = await getSessionCookie()
+
+    const res = await request(app)
+      .post(`/admin/ideas/${topic.id}/delete`)
+      .set('Cookie', cookie)
+
+    expect(res.status).toBe(302)
+    expect(res.headers.location).toBe('/admin')
+    const gone = db.prepare('SELECT * FROM topics WHERE id = ?').get(topic.id)
+    expect(gone).toBeUndefined()
+  })
+})
+
+describe('POST /admin/ideas/:id/skip', () => {
+  it('increments skip_count and redirects to /admin', async () => {
+    db.prepare("INSERT INTO topics (title, status, skip_count, created_at) VALUES ('Topic', 'pending', 0, datetime('now'))").run()
+    const topic = db.prepare('SELECT id FROM topics').get() as { id: number }
+    const cookie = await getSessionCookie()
+
+    const res = await request(app)
+      .post(`/admin/ideas/${topic.id}/skip`)
+      .set('Cookie', cookie)
+
+    expect(res.status).toBe(302)
+    expect(res.headers.location).toBe('/admin')
+    const updated = db.prepare('SELECT * FROM topics WHERE id = ?').get(topic.id) as { skip_count: number; status: string }
+    expect(updated.skip_count).toBe(1)
+    expect(updated.status).toBe('skipped')
+  })
+})
+
+describe('GET /admin — archived section', () => {
+  it('shows archived topics in a details section', async () => {
+    db.prepare("INSERT INTO topics (title, status, skip_count, created_at) VALUES ('Archived Topic', 'archived', 3, datetime('now'))").run()
+    const cookie = await getSessionCookie()
+
+    const res = await request(app).get('/admin').set('Cookie', cookie)
+    expect(res.text).toMatch(/Archived Topic/)
+    expect(res.text).toMatch(/<details/)
+  })
+
+  it('shows no archived topics message when none exist', async () => {
+    const cookie = await getSessionCookie()
+    const res = await request(app).get('/admin').set('Cookie', cookie)
+    expect(res.text).toMatch(/no archived/i)
+  })
+
+  it('does not show edit button for skipped topics', async () => {
+    db.prepare("INSERT INTO topics (title, status, skip_count, created_at) VALUES ('Skipped', 'skipped', 1, datetime('now'))").run()
+    const topic = db.prepare('SELECT id FROM topics').get() as { id: number }
+    const cookie = await getSessionCookie()
+
+    const res = await request(app).get('/admin').set('Cookie', cookie)
+    expect(res.text).not.toMatch(new RegExp(`/admin/ideas/${topic.id}/edit`))
+  })
+})
