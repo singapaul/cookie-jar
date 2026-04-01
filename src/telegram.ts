@@ -4,12 +4,16 @@ import { handleStatus, handleSkip } from './services/botCommandsService.js'
 
 let bot: TelegramBot | null = null
 
-export function initBot(token: string, db: Database.Database): TelegramBot {
+export async function initBot(token: string, db: Database.Database): Promise<TelegramBot> {
   if (bot) return bot
   const isProd = process.env.NODE_ENV === 'production'
   bot = new TelegramBot(token, { polling: !isProd })
 
   const chatId = process.env.TELEGRAM_CHAT_ID ?? ''
+
+  if (isProd && process.env.WEBHOOK_URL) {
+    await bot.setWebHook(`${process.env.WEBHOOK_URL}/telegram/webhook`)
+  }
 
   bot.onText(/\/status/, () => handleStatus(db, sendMessage, chatId))
   bot.onText(/\/skip/, () => handleSkip(db, sendMessage, chatId))
