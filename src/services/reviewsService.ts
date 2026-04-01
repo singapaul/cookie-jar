@@ -12,6 +12,7 @@ export function createReviewsService(db: Database.Database) {
     const params: (string | number)[] = []
     if (category) { query += ' AND t.category = ?'; params.push(category) }
     if (min_rating) { query += ' AND r.rating >= ?'; params.push(Number(min_rating)) }
+    query += ' ORDER BY r.reviewed_at DESC'
     return db.prepare(query).all(...params)
   }
 

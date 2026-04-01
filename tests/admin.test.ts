@@ -270,6 +270,53 @@ describe('GET /admin — flash message', () => {
   })
 })
 
+describe('GET /admin/reviews', () => {
+  it('shows empty state when no reviews exist', async () => {
+    const cookie = await getSessionCookie()
+    const res = await request(app).get('/admin/reviews').set('Cookie', cookie)
+    expect(res.status).toBe(200)
+    expect(res.text).toMatch(/no reviews/i)
+  })
+
+  it('renders review cards with all fields', async () => {
+    db.prepare("INSERT INTO topics (title, category, url, status, skip_count, created_at) VALUES ('Learn Rust', 'Systems', 'https://rust-lang.org', 'reviewed', 0, datetime('now'))").run()
+    const topic = db.prepare('SELECT id FROM topics').get() as { id: number }
+    db.prepare("INSERT INTO reviews (topic_id, pros, cons, rating, verdict, reviewed_at) VALUES (?, 'Great', 'Hard', 9, 'Worth it', datetime('now'))").run(topic.id)
+
+    const cookie = await getSessionCookie()
+    const res = await request(app).get('/admin/reviews').set('Cookie', cookie)
+
+    expect(res.text).toMatch(/Learn Rust/)
+    expect(res.text).toMatch(/Systems/)
+    expect(res.text).toMatch(/https:\/\/rust-lang\.org/)
+    expect(res.text).toMatch(/9/)
+    expect(res.text).toMatch(/Great/)
+    expect(res.text).toMatch(/Hard/)
+    expect(res.text).toMatch(/Worth it/)
+  })
+
+  it('renders reviews sorted by most recent first', async () => {
+    db.prepare("INSERT INTO topics (title, status, skip_count, created_at) VALUES ('Topic A', 'reviewed', 0, datetime('now'))").run()
+    db.prepare("INSERT INTO topics (title, status, skip_count, created_at) VALUES ('Topic B', 'reviewed', 0, datetime('now'))").run()
+    const [a, b] = db.prepare('SELECT id, title FROM topics').all() as { id: number; title: string }[]
+    db.prepare("INSERT INTO reviews (topic_id, rating, reviewed_at) VALUES (?, 7, '2026-01-01')").run(a.id)
+    db.prepare("INSERT INTO reviews (topic_id, rating, reviewed_at) VALUES (?, 8, '2026-03-01')").run(b.id)
+
+    const cookie = await getSessionCookie()
+    const res = await request(app).get('/admin/reviews').set('Cookie', cookie)
+
+    const posA = res.text.indexOf('Topic A')
+    const posB = res.text.indexOf('Topic B')
+    expect(posB).toBeLessThan(posA)
+  })
+
+  it('has Reviews link marked active in nav', async () => {
+    const cookie = await getSessionCookie()
+    const res = await request(app).get('/admin/reviews').set('Cookie', cookie)
+    expect(res.text).toMatch(/aria-current="page"[^>]*>Reviews|Reviews[^<]*<\/a>/)
+  })
+})
+
 describe('GET /admin — archived section', () => {
   it('shows archived topics in a details section', async () => {
     db.prepare("INSERT INTO topics (title, status, skip_count, created_at) VALUES ('Archived Topic', 'archived', 3, datetime('now'))").run()
