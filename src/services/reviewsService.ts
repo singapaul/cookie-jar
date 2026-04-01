@@ -39,5 +39,9 @@ export function createReviewsService(db: Database.Database) {
     db.prepare(`UPDATE reviews SET ${set} WHERE id = ?`).run(...values, id)
   }
 
-  return { list, count, get, update }
+  function remove(id: number): void {
+    db.prepare('DELETE FROM reviews WHERE id = ?').run(id)
+  }
+
+  return { list, count, get, update, remove }
 }

@@ -524,3 +524,19 @@ describe('POST /admin/send-reminder', () => {
     expect(decodeURIComponent(res.headers.location)).toMatch(/no reminder needed/i)
   })
 })
+
+describe('POST /admin/reviews/:id/delete', () => {
+  it('deletes the review and redirects to /admin/reviews', async () => {
+    db.prepare("INSERT INTO topics (title, status, skip_count, created_at) VALUES ('Learn Rust', 'reviewed', 0, datetime('now'))").run()
+    const topic = db.prepare('SELECT id FROM topics').get() as { id: number }
+    db.prepare("INSERT INTO reviews (topic_id, rating, reviewed_at) VALUES (?, 8, datetime('now'))").run(topic.id)
+    const review = db.prepare('SELECT id FROM reviews').get() as { id: number }
+    const cookie = await getSessionCookie()
+
+    const res = await request(app).post(`/admin/reviews/${review.id}/delete`).set('Cookie', cookie)
+    expect(res.status).toBe(302)
+    expect(res.headers.location).toBe('/admin/reviews')
+    const gone = db.prepare('SELECT * FROM reviews WHERE id = ?').get(review.id)
+    expect(gone).toBeUndefined()
+  })
+})

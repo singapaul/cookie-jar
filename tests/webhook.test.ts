@@ -50,33 +50,37 @@ describe('POST /telegram/webhook — commands', () => {
 })
 
 describe('POST /telegram/webhook — /idea command', () => {
-  it('saves a new topic with title only', async () => {
+  it('starts idea flow and prompts for category when title provided inline', async () => {
     await request(app)
       .post('/telegram/webhook')
       .send({ message: { text: '/idea Learn Rust' } })
 
-    const topic = db.prepare("SELECT * FROM topics WHERE title = 'Learn Rust'").get() as { status: string; category: string | null }
-    expect(topic).toBeDefined()
-    expect(topic.status).toBe('pending')
-    expect(topic.category).toBeNull()
+    const state = db.prepare('SELECT idea_step, idea_draft_title FROM conversation_state WHERE id = 1').get() as { idea_step: string; idea_draft_title: string }
+    expect(state.idea_step).toBe('awaiting_category')
+    expect(state.idea_draft_title).toBe('Learn Rust')
+    // No topic saved yet
+    const count = (db.prepare('SELECT COUNT(*) as n FROM topics').get() as { n: number }).n
+    expect(count).toBe(0)
   })
 
-  it('saves a new topic with title, category and url', async () => {
+  it('starts idea flow and prompts for category when title and extra info provided inline', async () => {
     await request(app)
       .post('/telegram/webhook')
       .send({ message: { text: '/idea Learn Rust | Systems | https://rust-lang.org' } })
 
-    const topic = db.prepare("SELECT * FROM topics WHERE title = 'Learn Rust'").get() as { category: string; url: string }
-    expect(topic.category).toBe('Systems')
-    expect(topic.url).toBe('https://rust-lang.org')
+    const state = db.prepare('SELECT idea_step, idea_draft_title FROM conversation_state WHERE id = 1').get() as { idea_step: string; idea_draft_title: string }
+    expect(state.idea_step).toBe('awaiting_category')
+    expect(state.idea_draft_title).toBe('Learn Rust | Systems | https://rust-lang.org')
   })
 
-  it('sends usage hint when called with no title', async () => {
+  it('prompts for title when /idea sent with no inline text', async () => {
     await request(app)
       .post('/telegram/webhook')
       .send({ message: { text: '/idea' } })
 
-    expect(mockSend).toHaveBeenCalledWith(expect.any(String), expect.stringContaining('Usage'), expect.any(Object))
+    const state = db.prepare('SELECT idea_step FROM conversation_state WHERE id = 1').get() as { idea_step: string }
+    expect(state.idea_step).toBe('awaiting_title')
+    expect(mockSend).toHaveBeenCalledWith(expect.any(String), expect.stringContaining("title"), expect.any(Object))
     const count = (db.prepare('SELECT COUNT(*) as n FROM topics').get() as { n: number }).n
     expect(count).toBe(0)
   })
@@ -102,5 +106,37 @@ describe('POST /telegram/webhook — callback_query', () => {
     const state = db.prepare('SELECT * FROM conversation_state WHERE id = 1').get() as { step: string; draft_rating: number }
     expect(state.step).toBe('awaiting_verdict')
     expect(state.draft_rating).toBe(8)
+  })
+})
+
+describe('POST /telegram/webhook — /idea step-by-step flow', () => {
+  it('starts the idea flow when /idea is sent with no title', async () => {
+    await request(app).post('/telegram/webhook').send({ message: { text: '/idea' } })
+    const state = db.prepare('SELECT * FROM conversation_state WHERE id = 1').get() as { idea_step: string }
+    expect(state.idea_step).toBe('awaiting_title')
+    expect(mockSend).toHaveBeenCalledWith(expect.any(String), expect.stringContaining('title'), expect.any(Object))
+  })
+
+  it('shows category keyboard when title is provided inline', async () => {
+    await request(app).post('/telegram/webhook').send({ message: { text: '/idea Learn Rust' } })
+    const state = db.prepare('SELECT * FROM conversation_state WHERE id = 1').get() as { idea_step: string; idea_draft_title: string }
+    expect(state.idea_step).toBe('awaiting_category')
+    expect(state.idea_draft_title).toBe('Learn Rust')
+  })
+
+  it('saves the idea after full flow: title → category callback → url skip', async () => {
+    // Set up: already in awaiting_category with a title
+    db.prepare("UPDATE conversation_state SET idea_step = 'awaiting_category', idea_draft_title = 'Learn Rust' WHERE id = 1").run()
+
+    await request(app).post('/telegram/webhook').send({ callback_query: { id: 'x', data: 'idea_cat:Systems' } })
+
+    const stateAfterCat = db.prepare('SELECT idea_step FROM conversation_state WHERE id = 1').get() as { idea_step: string }
+    expect(stateAfterCat.idea_step).toBe('awaiting_url')
+
+    await request(app).post('/telegram/webhook').send({ callback_query: { id: 'y', data: 'idea_url_skip' } })
+
+    const topic = db.prepare("SELECT * FROM topics WHERE title = 'Learn Rust'").get() as { category: string; status: string } | undefined
+    expect(topic).toBeDefined()
+    expect(topic!.status).toBe('pending')
   })
 })

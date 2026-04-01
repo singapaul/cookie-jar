@@ -130,6 +130,11 @@ export function createAdminRouter(
     res.redirect('/admin/reviews')
   })
 
+  router.post('/reviews/:id/delete', (req, res) => {
+    createReviewsService(db).remove(Number(req.params.id))
+    res.redirect('/admin/reviews')
+  })
+
   router.get('/reviews', (req, res) => {
     const svc = createReviewsService(db)
     const page = Number(req.query.page ?? 1)

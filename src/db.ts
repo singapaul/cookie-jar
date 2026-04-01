@@ -56,5 +56,10 @@ export function createDb(path: string): Database.Database {
     // Column already exists — ignore
   }
 
+  // Safe migrations for idea step-by-step flow
+  try { db.exec(`ALTER TABLE conversation_state ADD COLUMN idea_step TEXT DEFAULT 'idle'`) } catch {}
+  try { db.exec(`ALTER TABLE conversation_state ADD COLUMN idea_draft_title TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE conversation_state ADD COLUMN idea_draft_category TEXT`) } catch {}
+
   return db
 }
