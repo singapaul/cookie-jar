@@ -3,7 +3,7 @@ import type { Topic, Review } from '../types.js'
 export const CATEGORIES = [
   'Frontend', 'Backend', 'JS runtime', 'AI tooling', 'AI model',
   'Database', 'Testing', 'UI', 'State management', 'Auth', 'CSS',
-  'Build tool', 'Other',
+  'Build tool', 'System design', 'Other',
 ]
 
 const picoCSS = 'https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css'

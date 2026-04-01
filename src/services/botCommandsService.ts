@@ -7,7 +7,7 @@ const CATEGORY_KEYBOARD: InlineKeyboardButton[][] = [
   ['Frontend', 'Backend', 'JS runtime', 'AI tooling'].map(c => ({ text: c, callback_data: `idea_cat:${c}` })),
   ['AI model', 'Database', 'Testing', 'UI'].map(c => ({ text: c, callback_data: `idea_cat:${c}` })),
   ['State management', 'Auth', 'CSS', 'Build tool'].map(c => ({ text: c, callback_data: `idea_cat:${c}` })),
-  [{ text: 'Other', callback_data: 'idea_cat:Other' }, { text: '⏭ Skip', callback_data: 'idea_cat_skip' }],
+  [{ text: 'System design', callback_data: 'idea_cat:System design' }, { text: 'Other', callback_data: 'idea_cat:Other' }, { text: '⏭ Skip', callback_data: 'idea_cat_skip' }],
 ]
 
 async function saveIdea(db: Database.Database, sendMessage: SendMessage, chatId: string, url: string | null): Promise<void> {
