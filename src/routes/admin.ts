@@ -5,9 +5,14 @@ import { loginPage, ideasPage, reviewsPage } from '../admin/views.js'
 import { createIdeasService } from '../services/ideasService.js'
 import { createReviewsService } from '../services/reviewsService.js'
 import { sendWeekly, sendReviewPrompt } from '../services/schedulerService.js'
-import { sendMessage } from '../telegram.js'
+import { sendMessage as telegramSendMessage } from '../telegram.js'
+import type { SendMessage } from '../types.js'
 
-export function createAdminRouter(db: Database.Database, apiKey: string): Router {
+export function createAdminRouter(
+  db: Database.Database,
+  apiKey: string,
+  sendMessage: SendMessage = telegramSendMessage
+): Router {
   const router = Router()
 
   router.get('/login', (_req, res) => {

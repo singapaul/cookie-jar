@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import request from 'supertest'
 import { createApp } from '../src/app.js'
 import { createDb } from '../src/db.js'
@@ -21,7 +21,7 @@ async function getSessionCookie(): Promise<string> {
 
 beforeEach(() => {
   db = createDb(':memory:')
-  app = createApp(db, API_KEY)
+  app = createApp(db, API_KEY, vi.fn().mockResolvedValue({}))
 })
 
 describe('GET /admin/login', () => {
@@ -205,6 +205,68 @@ describe('POST /admin/ideas/:id/skip', () => {
     const updated = db.prepare('SELECT * FROM topics WHERE id = ?').get(topic.id) as { skip_count: number; status: string }
     expect(updated.skip_count).toBe(1)
     expect(updated.status).toBe('skipped')
+  })
+})
+
+describe('POST /admin/send-weekly', () => {
+  it('redirects to /admin with success flash when topic is sent', async () => {
+    db.prepare("INSERT INTO topics (title, status, skip_count, created_at) VALUES ('Learn Rust', 'pending', 0, datetime('now'))").run()
+    const cookie = await getSessionCookie()
+
+    const res = await request(app).post('/admin/send-weekly').set('Cookie', cookie)
+
+    expect(res.status).toBe(302)
+    expect(res.headers.location).toMatch(/\/admin\?flash=/)
+    expect(decodeURIComponent(res.headers.location)).toMatch(/sent/i)
+  })
+
+  it('redirects with error flash when no eligible topics', async () => {
+    const cookie = await getSessionCookie()
+
+    const res = await request(app).post('/admin/send-weekly').set('Cookie', cookie)
+
+    expect(res.status).toBe(302)
+    expect(decodeURIComponent(res.headers.location)).toMatch(/could not/i)
+  })
+})
+
+describe('POST /admin/send-review-prompt', () => {
+  it('redirects with success flash when review prompt sent', async () => {
+    db.prepare("INSERT INTO topics (title, status, skip_count, created_at) VALUES ('Learn Rust', 'sent', 0, datetime('now'))").run()
+    const topic = db.prepare('SELECT id FROM topics').get() as { id: number }
+    db.prepare('UPDATE conversation_state SET topic_id = ? WHERE id = 1').run(topic.id)
+    const cookie = await getSessionCookie()
+
+    const res = await request(app).post('/admin/send-review-prompt').set('Cookie', cookie)
+
+    expect(res.status).toBe(302)
+    expect(decodeURIComponent(res.headers.location)).toMatch(/sent/i)
+  })
+
+  it('redirects with warning flash when no active topic', async () => {
+    const cookie = await getSessionCookie()
+
+    const res = await request(app).post('/admin/send-review-prompt').set('Cookie', cookie)
+
+    expect(res.status).toBe(302)
+    expect(decodeURIComponent(res.headers.location)).toMatch(/no active/i)
+  })
+})
+
+describe('GET /admin — flash message', () => {
+  it('renders flash message from query param', async () => {
+    const cookie = await getSessionCookie()
+    const res = await request(app)
+      .get('/admin?flash=Topic%20sent!')
+      .set('Cookie', cookie)
+
+    expect(res.text).toMatch(/Topic sent!/)
+  })
+
+  it('renders no flash div when no query param', async () => {
+    const cookie = await getSessionCookie()
+    const res = await request(app).get('/admin').set('Cookie', cookie)
+    expect(res.text).not.toMatch(/role="alert"/)
   })
 })
 

@@ -103,6 +103,14 @@ export function ideasPage(topics: Topic[], flash?: string): string {
       <input name="url" placeholder="URL">
       <button type="submit">Add</button>
     </form>
+    <div style="display:flex;gap:0.5rem;margin-bottom:1rem">
+      <form method="POST" action="/admin/send-weekly">
+        <button type="submit">Send this week's topic</button>
+      </form>
+      <form method="POST" action="/admin/send-review-prompt">
+        <button type="submit" class="outline">Send review prompt</button>
+      </form>
+    </div>
     <h2>Ideas</h2>
     ${activeRows}
     <details>
