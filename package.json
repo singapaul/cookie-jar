@@ -23,6 +23,7 @@
   "homepage": "https://github.com/singapaul/cookie-jar#readme",
   "dependencies": {
     "better-sqlite3": "^12.8.0",
+    "cookie-parser": "^1.4.7",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "node-telegram-bot-api": "^0.67.0",
@@ -31,6 +32,7 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
+    "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.6",
     "@types/node": "^25.5.0",
     "@types/node-telegram-bot-api": "^0.64.14",

@@ -1,15 +1,20 @@
 import express, { type Express } from 'express'
+import cookieParser from 'cookie-parser'
 import type Database from 'better-sqlite3'
 import { createIdeasRouter } from './routes/ideas.js'
 import { createReviewsRouter } from './routes/reviews.js'
 import { createWebhookRouter } from './webhook.js'
+import { createAdminRouter } from './routes/admin.js'
 
 export function createApp(db: Database.Database | null, apiKey: string): Express {
   const app = express()
   app.use(express.json())
+  app.use(express.urlencoded({ extended: false }))
+  app.use(cookieParser(apiKey))
 
   if (db) {
     app.use('/telegram/webhook', createWebhookRouter(db))
+    app.use('/admin', createAdminRouter(db, apiKey))
   }
 
   app.use((req, res, next) => {
