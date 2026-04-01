@@ -8,7 +8,7 @@ export async function handleHelp(
 ): Promise<void> {
   await sendMessage(
     chatId,
-    `🍪 <b>Cookie Jar Bot</b>\n\n/help — Show this message\n/topic — See this week's topic\n/review — Start reviewing this week's topic\n/skip — Skip the current topic\n/status — Check the current step\n/history — See your last 5 reviews`,
+    `🍪 <b>Cookie Jar Bot</b>\n\n/help — Show this message\n/topic — See this week's topic\n/review — Start reviewing this week's topic\n/skip — Skip the current topic\n/status — Check the current step\n/history — See your last 5 reviews\n/idea Title | Category | URL — Save a new idea`,
     { parse_mode: 'HTML' }
   )
 }
@@ -93,6 +93,34 @@ export async function handleReview(
   await sendMessage(chatId, `⭐ Time to review <b>${topic.title}</b>! Let's go 👇\n\n<b>Step 1 of 4 — Pros</b>\nWhat did you like about it?`, { parse_mode: 'HTML' })
   db.prepare("UPDATE conversation_state SET step = 'awaiting_pros', updated_at = ? WHERE id = 1")
     .run(new Date().toISOString())
+}
+
+export async function handleIdea(
+  db: Database.Database,
+  sendMessage: SendMessage,
+  chatId: string,
+  text: string
+): Promise<void> {
+  // Format: /idea Title | Category | URL  (Category and URL optional)
+  const body = text.replace(/^\/idea\s*/i, '').trim()
+  if (!body) {
+    await sendMessage(chatId, '💡 Usage: <code>/idea Title | Category | URL</code>\nCategory and URL are optional.', { parse_mode: 'HTML' })
+    return
+  }
+  const [title, category, url] = body.split('|').map(s => s.trim())
+  if (!title) {
+    await sendMessage(chatId, '💡 Usage: <code>/idea Title | Category | URL</code>', { parse_mode: 'HTML' })
+    return
+  }
+  const now = new Date().toISOString()
+  db.prepare(`
+    INSERT INTO topics (title, category, url, status, skip_count, created_at)
+    VALUES (?, ?, ?, 'pending', 0, ?)
+  `).run(title, category || null, url || null, now)
+  const parts = [`✅ Idea saved: <b>${title}</b>`]
+  if (category) parts.push(`🏷 ${category}`)
+  if (url) parts.push(`🔗 ${url}`)
+  await sendMessage(chatId, parts.join('\n'), { parse_mode: 'HTML' })
 }
 
 export async function handleHistory(

@@ -192,7 +192,10 @@ export function ideasPage(
         <button type="submit" class="outline">Send reminder</button>
       </form>
     </div>
-    <h2>Ideas</h2>
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2>Ideas</h2>
+      <a href="/admin/ideas/export.json"><button class="outline">Export JSON</button></a>
+    </div>
     <form method="GET" action="/admin" style="display:flex;gap:0.5rem;margin-bottom:1rem">
       <input type="text" name="search" value="${search ?? ''}" placeholder="Search by title...">
       ${categorySelect('category', filterCategory, true)}

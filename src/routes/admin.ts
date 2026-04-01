@@ -100,6 +100,12 @@ export function createAdminRouter(
     res.redirect(`/admin?flash=${encodeURIComponent(flash)}`)
   })
 
+  router.get('/ideas/export.json', (_req, res) => {
+    const topics = createIdeasService(db).list({})
+    res.setHeader('Content-Disposition', 'attachment; filename="ideas.json"')
+    res.json(topics)
+  })
+
   router.get('/reviews/export.csv', (_req, res) => {
     const reviews = createReviewsService(db).list({}) as Record<string, unknown>[]
     const headers = ['id', 'topic_id', 'title', 'category', 'rating', 'pros', 'cons', 'verdict', 'reviewed_at']

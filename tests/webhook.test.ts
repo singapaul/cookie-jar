@@ -49,6 +49,39 @@ describe('POST /telegram/webhook — commands', () => {
   })
 })
 
+describe('POST /telegram/webhook — /idea command', () => {
+  it('saves a new topic with title only', async () => {
+    await request(app)
+      .post('/telegram/webhook')
+      .send({ message: { text: '/idea Learn Rust' } })
+
+    const topic = db.prepare("SELECT * FROM topics WHERE title = 'Learn Rust'").get() as { status: string; category: string | null }
+    expect(topic).toBeDefined()
+    expect(topic.status).toBe('pending')
+    expect(topic.category).toBeNull()
+  })
+
+  it('saves a new topic with title, category and url', async () => {
+    await request(app)
+      .post('/telegram/webhook')
+      .send({ message: { text: '/idea Learn Rust | Systems | https://rust-lang.org' } })
+
+    const topic = db.prepare("SELECT * FROM topics WHERE title = 'Learn Rust'").get() as { category: string; url: string }
+    expect(topic.category).toBe('Systems')
+    expect(topic.url).toBe('https://rust-lang.org')
+  })
+
+  it('sends usage hint when called with no title', async () => {
+    await request(app)
+      .post('/telegram/webhook')
+      .send({ message: { text: '/idea' } })
+
+    expect(mockSend).toHaveBeenCalledWith(expect.any(String), expect.stringContaining('Usage'), expect.any(Object))
+    const count = (db.prepare('SELECT COUNT(*) as n FROM topics').get() as { n: number }).n
+    expect(count).toBe(0)
+  })
+})
+
 describe('POST /telegram/webhook — callback_query', () => {
   it('responds 200 to callback_query events', async () => {
     const res = await request(app)
