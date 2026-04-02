@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import type Database from 'better-sqlite3'
 import { requireAdminSession, setSessionCookie } from '../admin/auth.js'
-import { loginPage, ideasPage, reviewsPage } from '../admin/views.js'
+import { loginPage, ideasPage, reviewsPage, exportPage } from '../admin/views.js'
 import { createIdeasService } from '../services/ideasService.js'
 import { createReviewsService } from '../services/reviewsService.js'
 import { sendWeekly, sendReviewPrompt, sendReminder } from '../services/schedulerService.js'
@@ -41,11 +41,13 @@ export function createAdminRouter(
 
     const totalActive =
       svc.count({ status: 'pending', search, category }) +
-      svc.count({ status: 'skipped', search, category })
+      svc.count({ status: 'skipped', search, category }) +
+      svc.count({ status: 'sent', search, category })
 
     const offset = (page - 1) * PAGE_SIZE
 
     const topics = [
+      ...svc.list({ status: 'sent', search, category }),
       ...svc.list({ status: 'pending', search, category, limit: PAGE_SIZE, offset }),
       ...svc.list({ status: 'skipped', search, category, limit: PAGE_SIZE, offset }),
       ...svc.list({ status: 'archived', search, category }),
@@ -79,6 +81,17 @@ export function createAdminRouter(
     res.redirect('/admin')
   })
 
+  router.post('/ideas/:id/reset', (req, res) => {
+    const id = Number(req.params.id)
+    const result = createIdeasService(db).resetToPending(id)
+    if (!('error' in result)) {
+      // Clear conversation state if this was the active topic
+      db.prepare("UPDATE conversation_state SET topic_id = NULL, step = 'idle', updated_at = ? WHERE topic_id = ?")
+        .run(new Date().toISOString(), id)
+    }
+    res.redirect('/admin')
+  })
+
   router.post('/send-weekly', async (_req, res) => {
     const chatId = process.env.TELEGRAM_CHAT_ID ?? ''
     const result = await sendWeekly(db, sendMessage, chatId)
@@ -104,6 +117,12 @@ export function createAdminRouter(
     const topics = createIdeasService(db).list({})
     res.setHeader('Content-Disposition', 'attachment; filename="ideas.json"')
     res.json(topics)
+  })
+
+  router.get('/export', (_req, res) => {
+    const topics = createIdeasService(db).list({})
+    const reviews = createReviewsService(db).list({})
+    res.send(exportPage({ topics, reviews }))
   })
 
   router.get('/reviews/export.csv', (_req, res) => {

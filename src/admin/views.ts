@@ -188,13 +188,14 @@ const layout = (title: string, body: string) => `
 </body>
 </html>`
 
-export function adminLayout(title: string, activePage: 'ideas' | 'reviews', body: string): string {
+export function adminLayout(title: string, activePage: 'ideas' | 'reviews' | 'export', body: string): string {
   return layout(title, `
     <nav class="topnav">
       <a class="brand" href="/admin">🍪 Cookie Jar</a>
       <ul class="nav-links">
         <li><a href="/admin" ${activePage === 'ideas' ? 'aria-current="page"' : ''}>Ideas</a></li>
         <li><a href="/admin/reviews" ${activePage === 'reviews' ? 'aria-current="page"' : ''}>Reviews</a></li>
+        <li><a href="/admin/export" ${activePage === 'export' ? 'aria-current="page"' : ''}>Export</a></li>
       </ul>
     </nav>
     <main class="container">
@@ -222,6 +223,7 @@ export function loginPage(error?: string): string {
 function statusBadge(status: string): string {
   const styles: Record<string, string> = {
     pending:  'background:#d1fae5;color:#065f46',
+    sent:     'background:#dbeafe;color:#1e40af',
     skipped:  'background:#fed7aa;color:#9a3412',
     archived: 'background:#e5e7eb;color:#374151',
   }
@@ -262,12 +264,17 @@ function topicRow(t: Topic): string {
       <td data-label="Status">${statusBadge(t.status)}${t.skip_count > 0 ? `<small style="color:var(--muted)"> (${t.skip_count}x)</small>` : ''}</td>
       <td data-label="Actions">
         <div style="display:flex;flex-wrap:wrap;gap:0.35rem;align-items:center">
+          ${t.status === 'sent' ? `
+          <form method="POST" action="/admin/ideas/${t.id}/reset" style="display:inline">
+            <button type="submit" class="btn btn-outline btn-sm">Reset to pending</button>
+          </form>` : `
           <form method="POST" action="/admin/ideas/${t.id}/skip" style="display:inline">
             <button type="submit" class="btn btn-outline btn-sm">Skip</button>
-          </form>
+          </form>`}
+          ${['pending', 'sent', 'reviewed'].includes(t.status) ? `
           <form method="POST" action="/admin/ideas/${t.id}/delete" style="display:inline">
             <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Delete this topic?')">Delete</button>
-          </form>
+          </form>` : ''}
           ${editForm}
         </div>
       </td>
@@ -319,6 +326,11 @@ function statsCards(stats: StatsResult): string {
         <div class="stat-val">${stats.pending} / ${stats.skipped}</div>
         <div class="stat-label">Pending / Skipped</div>
       </div>
+      ${stats.sent > 0 ? `
+      <div class="stat-card" style="border-color:#bfdbfe">
+        <div class="stat-val" style="color:#1e40af">${stats.sent}</div>
+        <div class="stat-label">Sent (awaiting review)</div>
+      </div>` : ''}
     </div>`
 }
 
@@ -332,7 +344,7 @@ export function ideasPage(
   totalActive?: number,
   pageSize = 20,
 ): string {
-  const active = topics.filter(t => t.status === 'pending' || t.status === 'skipped')
+  const active = topics.filter(t => t.status === 'pending' || t.status === 'skipped' || t.status === 'sent')
   const archived = topics.filter(t => t.status === 'archived')
 
   const totalPages = totalActive !== undefined ? Math.max(1, Math.ceil(totalActive / pageSize)) : 1
@@ -398,6 +410,28 @@ export function ideasPage(
       <summary>Archived topics (${archived.length})</summary>
       ${archivedItems}
     </details>
+  `)
+}
+
+export function exportPage(data: { topics: Topic[]; reviews: unknown[] }): string {
+  const json = JSON.stringify(data, null, 2)
+  const escaped = json.replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026')
+  return adminLayout('Export', 'export', `
+    <div class="page-header">
+      <h2>Data Export</h2>
+      <button id="copy-btn" class="btn btn-primary btn-sm" onclick="copyJson()">Copy JSON</button>
+    </div>
+    <pre id="json-preview" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-card);padding:1rem;font-size:0.78rem;line-height:1.5;overflow:auto;max-height:70vh;white-space:pre-wrap;word-break:break-word;">${escaped}</pre>
+    <script>
+      function copyJson() {
+        const text = document.getElementById('json-preview').textContent
+        navigator.clipboard.writeText(text).then(() => {
+          const btn = document.getElementById('copy-btn')
+          btn.textContent = 'Copied!'
+          setTimeout(() => { btn.textContent = 'Copy JSON' }, 2000)
+        })
+      }
+    </script>
   `)
 }
 

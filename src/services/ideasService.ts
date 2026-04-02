@@ -80,9 +80,20 @@ export function createIdeasService(db: Database.Database) {
   function remove(id: number): { deleted: true } | ServiceError {
     const topic = db.prepare('SELECT * FROM topics WHERE id = ?').get(id) as Topic | undefined
     if (!topic) return { error: 'not_found' }
-    if (topic.status !== 'pending') return { error: 'forbidden' }
+    if (!['pending', 'sent', 'reviewed'].includes(topic.status)) return { error: 'forbidden' }
+    if (topic.status === 'reviewed') {
+      db.prepare('DELETE FROM reviews WHERE topic_id = ?').run(id)
+    }
     db.prepare('DELETE FROM topics WHERE id = ?').run(id)
     return { deleted: true }
+  }
+
+  function resetToPending(id: number): Topic | ServiceError {
+    const topic = db.prepare('SELECT * FROM topics WHERE id = ?').get(id) as Topic | undefined
+    if (!topic) return { error: 'not_found' }
+    if (topic.status !== 'sent') return { error: 'forbidden' }
+    db.prepare("UPDATE topics SET status = 'pending', sent_at = NULL WHERE id = ?").run(id)
+    return db.prepare('SELECT * FROM topics WHERE id = ?').get(id) as Topic
   }
 
   function skip(id: number): Topic | ServiceError {
@@ -95,5 +106,5 @@ export function createIdeasService(db: Database.Database) {
     return db.prepare('SELECT * FROM topics WHERE id = ?').get(id) as Topic
   }
 
-  return { create, list, count, getStats, update, remove, skip }
+  return { create, list, count, getStats, update, remove, skip, resetToPending }
 }
