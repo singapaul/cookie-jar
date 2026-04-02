@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express'
 import type Database from 'better-sqlite3'
 import { handleMessage, handleCallbackQuery } from './services/reviewService.js'
-import { handleStatus, handleSkip, handleHelp, handleTopic, handleReview, handleHistory, handleIdea, handleIdeaCallback } from './services/botCommandsService.js'
+import { handleStatus, handleSkip, handleHelp, handleTopic, handleReview, handleHistory, handleTopics, handleIdea, handleIdeaCallback } from './services/botCommandsService.js'
 import { answerCallbackQuery, sendMessage as telegramSendMessage } from './telegram.js'
 import type { SendMessage } from './types.js'
 
@@ -28,6 +28,7 @@ export function createWebhookRouter(db: Database.Database, sendMessage: SendMess
       else if (text === '/topic' || text.startsWith('/topic ')) await handleTopic(db, sendMessage, chatId)
       else if (text === '/review' || text.startsWith('/review ')) await handleReview(db, sendMessage, chatId)
       else if (text === '/history' || text.startsWith('/history ')) await handleHistory(db, sendMessage, chatId)
+      else if (text === '/topics' || text.startsWith('/topics ')) await handleTopics(db, sendMessage, chatId)
       else if (text.startsWith('/idea')) await handleIdea(db, sendMessage, chatId, text)
       else if (inIdeaFlow) await handleIdea(db, sendMessage, chatId, text)
       else await handleMessage(db, sendMessage, chatId, text)

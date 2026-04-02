@@ -29,7 +29,7 @@ export async function handleHelp(
 ): Promise<void> {
   await sendMessage(
     chatId,
-    `🍪 <b>Cookie Jar Bot</b>\n\n/help — Show this message\n/topic — See this week's topic\n/review — Start reviewing this week's topic\n/skip — Skip the current topic\n/status — Check the current step\n/history — See your last 5 reviews\n/idea — Submit a new idea step by step`,
+    `🍪 <b>Cookie Jar Bot</b>\n\n/help — Show this message\n/topic — See this week's topic\n/review — Start reviewing this week's topic\n/skip — Skip the current topic\n/status — Check the current step\n/history — See your last 5 reviews\n/topics — List all topics not yet covered\n/idea — Submit a new idea step by step`,
     { parse_mode: 'HTML' }
   )
 }
@@ -180,6 +180,29 @@ export async function handleIdeaCallback(
     if (state.idea_step !== 'awaiting_url') return
     await saveIdea(db, sendMessage, chatId, null)
   }
+}
+
+export async function handleTopics(
+  db: Database.Database,
+  sendMessage: SendMessage,
+  chatId: string
+): Promise<void> {
+  const topics = db.prepare(`
+    SELECT title
+    FROM topics
+    WHERE status IN ('pending', 'skipped', 'sent')
+    ORDER BY title
+  `).all() as { title: string }[]
+
+  if (topics.length === 0) {
+    await sendMessage(chatId, '🎉 You\'ve covered everything in the jar!')
+    return
+  }
+
+  const lines = [`📋 <b>Not yet covered (${topics.length}):</b>`, '']
+  for (const t of topics) lines.push(`• ${t.title}`)
+
+  await sendMessage(chatId, lines.join('\n'), { parse_mode: 'HTML' })
 }
 
 export async function handleHistory(
