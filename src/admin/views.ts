@@ -344,7 +344,7 @@ export function ideasPage(
   totalActive?: number,
   pageSize = 20,
 ): string {
-  const active = topics.filter(t => t.status === 'pending' || t.status === 'skipped' || t.status === 'sent')
+  const active = topics.filter(t => t.status === 'pending' || t.status === 'skipped' || t.status === 'sent' || t.status === 'reviewed')
   const archived = topics.filter(t => t.status === 'archived')
 
   const totalPages = totalActive !== undefined ? Math.max(1, Math.ceil(totalActive / pageSize)) : 1

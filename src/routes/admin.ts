@@ -42,7 +42,8 @@ export function createAdminRouter(
     const totalActive =
       svc.count({ status: 'pending', search, category }) +
       svc.count({ status: 'skipped', search, category }) +
-      svc.count({ status: 'sent', search, category })
+      svc.count({ status: 'sent', search, category }) +
+      svc.count({ status: 'reviewed', search, category })
 
     const offset = (page - 1) * PAGE_SIZE
 
@@ -50,6 +51,7 @@ export function createAdminRouter(
       ...svc.list({ status: 'sent', search, category }),
       ...svc.list({ status: 'pending', search, category, limit: PAGE_SIZE, offset }),
       ...svc.list({ status: 'skipped', search, category, limit: PAGE_SIZE, offset }),
+      ...svc.list({ status: 'reviewed', search, category }),
       ...svc.list({ status: 'archived', search, category }),
     ]
 
